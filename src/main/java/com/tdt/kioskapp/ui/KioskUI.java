@@ -1,16 +1,17 @@
 package com.tdt.kioskapp.ui;
 
-import com.firebase.client.*;
-import com.tdt.kioskapp.dto.RequestPackageDTO;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.firebase.client.DataSnapshot;
+import com.firebase.client.Firebase;
+import com.firebase.client.FirebaseError;
+import com.firebase.client.ValueEventListener;
 import com.tdt.kioskapp.dto.SlideDTO;
 import com.tdt.kioskapp.service.BaseService;
 import net.lingala.zip4j.exception.ZipException;
 import org.apache.log4j.Logger;
-import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationContextAware;
 import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestTemplate;
 import uk.co.caprica.vlcj.component.EmbeddedMediaPlayerComponent;
 import uk.co.caprica.vlcj.player.embedded.EmbeddedMediaPlayer;
 
@@ -106,43 +107,11 @@ public class KioskUI extends JFrame implements Runnable {
 
     private void startSlideShow(final BaseService baseService) throws Exception {
 
-        Map<String, SlideDTO> manifest = null;
-        File dataFolder = new File(baseService.TEMP_DIR);
-        File manifestFile = new File(baseService.TEMP_DIR + "/" + baseService.MANIFEST_JSON);
+        ObjectMapper objectMapper = new ObjectMapper();
+        Map<String, SlideDTO> manifest = objectMapper.
+                readValue(new File(baseService.reformatPath(baseService.TEMP_DIR + "/" + baseService.MANIFEST_JSON)), new TypeReference<Map<String, SlideDTO>>() {
+                });
 
-        Firebase firebase = new Firebase(baseService.getFirebaseURL());
-        firebase.authWithCustomToken("", null);
-
-        firebase.child("updates").addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                String manifest = (String) dataSnapshot.getValue();
-                try {
-                    baseService.getRequest(baseService.getLogin(null), manifest);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-
-            @Override
-            public void onCancelled(FirebaseError firebaseError) {
-
-            }
-        });
-
-        firebase.child("downloads").addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-
-            }
-
-            @Override
-            public void onCancelled(FirebaseError firebaseError) {
-
-            }
-        });
-//        String path = Application.class.getProtectionDomain().getCodeSource().getLocation().getPath().substring(1);
-//        String decodedPath = URLDecoder.decode(path, "UTF-8");
         for (Map.Entry<String, SlideDTO> entry : manifest.entrySet()) {
             SlideDTO currentValue = entry.getValue();
             File currentFile = baseService.readAllFiles(BaseService.reformatPath(BaseService.TEMP_DIR + "/" + currentValue.getLocation()));
@@ -221,14 +190,63 @@ public class KioskUI extends JFrame implements Runnable {
 
 
                 File manifest = baseService.readAllFiles(BaseService.reformatPath(BaseService.TEMP_DIR + "/" + baseService.MANIFEST_JSON));
-                File data =  baseService.readAllFiles(BaseService.reformatPath(BaseService.TEMP_DIR));
+                File data = baseService.readAllFiles(BaseService.reformatPath(BaseService.TEMP_DIR));
                 boolean exist = manifest.exists() && (baseService.countFiles(data.getAbsolutePath()) >= 2);
-                hideMouse();
+                if (exist) {
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                hideMouse();
+                                startSlideShow(baseService);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }).start();
+                } else { // subscribe to 2 channels
+
+                    Firebase firebase = new Firebase(baseService.getFirebaseURL());
+                    firebase.authWithCustomToken("", null);
+
+                    firebase.child("updates").addValueEventListener(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(DataSnapshot dataSnapshot) {
+                            String manifest = (String) dataSnapshot.getValue();
+                            try {
+                                baseService.getRequest(baseService.getLogin(null), manifest);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(FirebaseError firebaseError) {
+
+                        }
+                    });
+
+                    firebase.child("downloads").addValueEventListener(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(DataSnapshot dataSnapshot) {
+
+                            try {
+                                baseService.downloadAndUnpack(baseService.getLogin(null));
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(FirebaseError firebaseError) {
+
+                        }
+                    });
+                }
                 if (KioskUI.this.getContentPane() != mediaPlayerComponent) {
                     KioskUI.this.setContentPane(mediaPlayerComponent);
                 }
                 resetUI();
-                startSlideShow(baseService);
                 activated = true;
             } catch (Exception e) {
                 if (!(e instanceof ResourceAccessException || e instanceof ZipException) || !baseService.registered()) {

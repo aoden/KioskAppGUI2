@@ -2,7 +2,6 @@ package com.tdt.kioskapp.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tdt.kioskapp.Application;
 import com.tdt.kioskapp.dto.AccessTokenDTO;
 import com.tdt.kioskapp.dto.KeyDTO;
 import com.tdt.kioskapp.dto.RequestPackageDTO;
@@ -28,7 +27,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URLDecoder;
 import java.util.List;
 import java.util.Map;
 
@@ -46,24 +44,13 @@ public class BaseService extends AbstractService {
     @Value("firebase.url")
     private String firebaseURL;
 
-    public RequestPackageDTO getRequest(String key, String manifest) {
-        UriComponentsBuilder builder = UriComponentsBuilder
-                .fromHttpUrl(baseURL + "request-package")
-                .queryParam("access_token", key)
-                .queryParam("manifest", manifest);
-        RequestPackageDTO requestPackageDTO =
-                restTemplate.exchange(builder.build().encode().toUri(), HttpMethod.GET, null, RequestPackageDTO.class).getBody();
-        requestRepository.save(Request.builder().request(requestPackageDTO.getRequest()).build());
-        return requestPackageDTO;
-    }
-
     public static String reformatPath(String location) {
         String reformattedPath = "";
         if (location.contains("/../")) {
 
             String[] fragments = location.split("/");
             for (int i = 0; i < fragments.length; i++) {
-                if ((i < fragments.length -1 && !fragments[i + 1].equals("..")) && !fragments[i].equals("..")) {
+                if ((i < fragments.length - 1 && !fragments[i + 1].equals("..")) && !fragments[i].equals("..")) {
                     reformattedPath += (i == 0 ? fragments[i] : ("/" + fragments[i]));
                 }
             }
@@ -77,6 +64,7 @@ public class BaseService extends AbstractService {
 
     /**
      * Because VLCJ uses native libraries, for windows it uses "\" in stead of "/" in paths so we must detect and change it
+     *
      * @param reformattedPath path to be changed
      * @return changedPath
      */
@@ -85,6 +73,38 @@ public class BaseService extends AbstractService {
             reformattedPath = reformattedPath.replace("/", "\\");
         }
         return reformattedPath;
+    }
+
+    public void downloadAndUnpack(String key) throws Exception {
+
+        List<Request> requests = requestRepository.findAll();
+        for (Request req : requests) {
+
+            UriComponentsBuilder builder = UriComponentsBuilder
+                    .fromHttpUrl(baseURL + "download-package")
+                    .queryParam("access_token", key)
+                    .queryParam("request", req.getRequest());
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Accept", "*/*");
+            headers.add("Accept-Encoding", "gzip, deflate, sdch");
+            HttpEntity<Object> httpEntity = new HttpEntity<>(headers);
+            byte[] data = restTemplate.exchange(builder.build().encode().toUri(), HttpMethod.GET, httpEntity, byte[].class).getBody();
+            File file = new File(reformatPath(TEMP_DIR + "/data.zip"));
+            FileUtils.writeByteArrayToFile(file, data);
+            ZipFile zipFile = new ZipFile(file);
+            zipFile.extractAll(reformatPath(TEMP_DIR));
+        }
+    }
+
+    public RequestPackageDTO getRequest(String key, String manifest) {
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromHttpUrl(baseURL + "request-package")
+                .queryParam("access_token", key)
+                .queryParam("manifest", manifest);
+        RequestPackageDTO requestPackageDTO =
+                restTemplate.exchange(builder.build().encode().toUri(), HttpMethod.GET, null, RequestPackageDTO.class).getBody();
+        requestRepository.save(Request.builder().request(requestPackageDTO.getRequest()).build());
+        return requestPackageDTO;
     }
 
     public int countFiles(String location) {
