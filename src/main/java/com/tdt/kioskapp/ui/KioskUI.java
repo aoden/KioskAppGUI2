@@ -6,6 +6,7 @@ import com.firebase.client.DataSnapshot;
 import com.firebase.client.Firebase;
 import com.firebase.client.FirebaseError;
 import com.firebase.client.ValueEventListener;
+import com.tdt.kioskapp.dto.FirebaseTokenDTO;
 import com.tdt.kioskapp.dto.SlideDTO;
 import com.tdt.kioskapp.service.BaseService;
 import net.lingala.zip4j.exception.ZipException;
@@ -207,9 +208,10 @@ public class KioskUI extends JFrame implements Runnable {
                 } else { // subscribe to 2 channels
 
                     Firebase firebase = new Firebase(baseService.getFirebaseURL());
-                    firebase.authWithCustomToken("", null);
+                    FirebaseTokenDTO tokenDTO = baseService.getFirebaseToken(baseService.getLogin(null));
+                    firebase.authWithCustomToken(tokenDTO.getFirebaseToken(), null);
 
-                    firebase.child("updates").addValueEventListener(new ValueEventListener() {
+                    firebase.child(tokenDTO.getUpdates()).addValueEventListener(new ValueEventListener() {
                         @Override
                         public void onDataChange(DataSnapshot dataSnapshot) {
                             String manifest = (String) dataSnapshot.getValue();
@@ -226,7 +228,7 @@ public class KioskUI extends JFrame implements Runnable {
                         }
                     });
 
-                    firebase.child("downloads").addValueEventListener(new ValueEventListener() {
+                    firebase.child(tokenDTO.getDownloads()).addValueEventListener(new ValueEventListener() {
                         @Override
                         public void onDataChange(DataSnapshot dataSnapshot) {
 

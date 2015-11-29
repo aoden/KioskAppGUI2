@@ -2,10 +2,7 @@ package com.tdt.kioskapp.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tdt.kioskapp.dto.AccessTokenDTO;
-import com.tdt.kioskapp.dto.KeyDTO;
-import com.tdt.kioskapp.dto.RequestPackageDTO;
-import com.tdt.kioskapp.dto.SlideDTO;
+import com.tdt.kioskapp.dto.*;
 import com.tdt.kioskapp.model.Key;
 import com.tdt.kioskapp.model.Request;
 import com.tdt.kioskapp.repository.KeyRepository;
@@ -41,7 +38,7 @@ public class BaseService extends AbstractService {
     private RequestRepository requestRepository;
     @Value("${url}")
     private String baseURL;
-    @Value("firebase.url")
+    @Value("${firebase.url}")
     private String firebaseURL;
 
     public static String reformatPath(String location) {
@@ -75,13 +72,21 @@ public class BaseService extends AbstractService {
         return reformattedPath;
     }
 
+    public FirebaseTokenDTO getFirebaseToken(String key) {
+
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromHttpUrl(baseURL + "firebase-token")
+                .queryParam("access_token", key);
+        return restTemplate.exchange(builder.build().encode().toUri(), HttpMethod.GET, null, FirebaseTokenDTO.class).getBody();
+    }
+
     public void downloadAndUnpack(String key) throws Exception {
 
         List<Request> requests = requestRepository.findAll();
         for (Request req : requests) {
 
             UriComponentsBuilder builder = UriComponentsBuilder
-                    .fromHttpUrl(baseURL + "download-package")
+                    .fromHttpUrl(baseURL + "package")
                     .queryParam("access_token", key)
                     .queryParam("request", req.getRequest());
             HttpHeaders headers = new HttpHeaders();
@@ -181,11 +186,7 @@ public class BaseService extends AbstractService {
 
     protected Map<String, SlideDTO> processData(byte[] data) throws IOException, ZipException {
 
-////        String basePath = URLDecoder.decode(Application.class.getProtectionDomain().getCodeSource().getLocation().getPath(), "UTF-8");
-//        File temp = new File(reformatPath(TEMP_DIR));
-//        if (temp.isFile() || !temp.exists()) {
-//            temp.mkdir();
-//        }
+
         File file = new File(reformatPath(TEMP_DIR + "/data.zip"));
         FileUtils.writeByteArrayToFile(file, data);
         ZipFile zipFile = new ZipFile(file);
@@ -196,7 +197,6 @@ public class BaseService extends AbstractService {
     }
 
     protected Map<String, SlideDTO> processData() throws IOException, ZipException {
-//        String basePath = URLDecoder.decode(Application.class.getProtectionDomain().getCodeSource().getLocation().getPath(), "UTF-8");
         ObjectMapper objectMapper = new ObjectMapper();
         return objectMapper.readValue(new File(reformatPath(TEMP_DIR + "/" + MANIFEST_JSON)), new TypeReference<Map<String, SlideDTO>>() {
         });
