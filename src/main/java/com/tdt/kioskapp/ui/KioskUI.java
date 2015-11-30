@@ -18,7 +18,12 @@ import uk.co.caprica.vlcj.player.embedded.EmbeddedMediaPlayer;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -47,7 +52,9 @@ public class KioskUI extends JFrame implements Runnable {
     protected JTextField textField = new JTextField();
     protected JButton startBtn = new JButton("START");
     Logger logger = Logger.getLogger(KioskUI.class);
+    Thread slideShowThread;
     private BaseService baseService;
+    private Firebase firebase = null;
     private KeyAdapter keyListener = new KeyAdapter() {
         @Override
         public void keyTyped(KeyEvent e) {
@@ -67,6 +74,9 @@ public class KioskUI extends JFrame implements Runnable {
         public void keyReleased(KeyEvent e) {
         }
     };
+    private ObjectMapper objectMapper = new ObjectMapper();
+    ;
+    private Container loadingPane;
 
     public KioskUI(ApplicationContext context) throws ZipException, IOException {
 
@@ -184,72 +194,47 @@ public class KioskUI extends JFrame implements Runnable {
     @Override
     public void run() {
 
+        String key = baseService.getLogin(null);
+        if (!baseService.registered()) {
+
+            key = baseService.register(textField.getText());
+        }
+
+        key = baseService.login(key);
+        final String finalKey = key;
+
         while (play) {
 
             Container oldContentPane = KioskUI.this.getContentPane();
             try {
 
-
-                File manifest = baseService.readAllFiles(BaseService.reformatPath(BaseService.TEMP_DIR + "/" + baseService.MANIFEST_JSON));
-                File data = baseService.readAllFiles(BaseService.reformatPath(BaseService.TEMP_DIR));
-                boolean exist = manifest.exists() && (baseService.countFiles(data.getAbsolutePath()) >= 2);
+                slideShowThread = null;
+                File manifest = baseService.readAllFiles(BaseService.reformatPath(BaseService.TEMP_DIR));
+                boolean exist = manifest != null && (baseService.countFiles(BaseService.TEMP_DIR) >= 2);
                 if (exist) {
-                    new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                hideMouse();
-                                startSlideShow(baseService);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    }).start();
+
+                    if (KioskUI.this.getContentPane() != mediaPlayerComponent) {
+                        KioskUI.this.setContentPane(mediaPlayerComponent);
+                    }
+                    resetUI();
+                    activated = true;
+                    hideMouse();
+                    startSlideShow(baseService);
+                    initFirebase(key, finalKey);
                 } else { // subscribe to 2 channels
 
-                    Firebase firebase = new Firebase(baseService.getFirebaseURL());
-                    FirebaseTokenDTO tokenDTO = baseService.getFirebaseToken(baseService.getLogin(null));
-                    firebase.authWithCustomToken(tokenDTO.getFirebaseToken(), null);
+                    initFirebase(key, finalKey);
+                    // add loading text
+                    if (KioskUI.this.getContentPane() != loadingPane) {
 
-                    firebase.child(tokenDTO.getUpdates()).addValueEventListener(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(DataSnapshot dataSnapshot) {
-                            String manifest = (String) dataSnapshot.getValue();
-                            try {
-                                baseService.getRequest(baseService.getLogin(null), manifest);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
-                        }
-
-                        @Override
-                        public void onCancelled(FirebaseError firebaseError) {
-
-                        }
-                    });
-
-                    firebase.child(tokenDTO.getDownloads()).addValueEventListener(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(DataSnapshot dataSnapshot) {
-
-                            try {
-                                baseService.downloadAndUnpack(baseService.getLogin(null));
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
-                        }
-
-                        @Override
-                        public void onCancelled(FirebaseError firebaseError) {
-
-                        }
-                    });
+                        loadingPane = new JPanel();
+                        KioskUI.this.setContentPane(loadingPane);
+                        KioskUI.this.getContentPane().setBackground(Color.BLACK);
+                        JLabel loadingText = new JLabel("<html><font color='gray'>LOADING...</font></html>");
+                        KioskUI.this.getContentPane().add(loadingText);
+                        resetUI();
+                    }
                 }
-                if (KioskUI.this.getContentPane() != mediaPlayerComponent) {
-                    KioskUI.this.setContentPane(mediaPlayerComponent);
-                }
-                resetUI();
-                activated = true;
             } catch (Exception e) {
                 if (!(e instanceof ResourceAccessException || e instanceof ZipException) || !baseService.registered()) {
 
@@ -261,6 +246,54 @@ public class KioskUI extends JFrame implements Runnable {
                     break;
                 }
             }
+        }
+    }
+
+    private void initFirebase(String key, final String finalKey) {
+        if (firebase == null) {
+
+            firebase = new Firebase(baseService.getFirebaseURL());
+            FirebaseTokenDTO tokenDTO = baseService.getFirebaseToken(key);
+            firebase.authWithCustomToken(tokenDTO.getFirebaseToken(), null);
+
+            firebase.child(tokenDTO.getUpdates()).addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+                    String manifest = "";
+                    try {
+                        File manifestFile = new File(baseService.reformatPath(BaseService.TEMP_DIR + "/" + BaseService.MANIFEST_JSON));
+                        if (manifestFile.exists())
+                            manifest = objectMapper.readValue(manifestFile, new TypeReference<String>() {
+                            });
+                        baseService.getRequest(finalKey, manifest);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @Override
+                public void onCancelled(FirebaseError firebaseError) {
+
+                }
+            });
+
+            firebase.child(tokenDTO.getDownloads()).addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+
+                    try {
+
+                        baseService.downloadAndUnpack(finalKey);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @Override
+                public void onCancelled(FirebaseError firebaseError) {
+
+                }
+            });
         }
     }
 

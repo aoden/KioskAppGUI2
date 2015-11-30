@@ -16,7 +16,6 @@ import javax.persistence.Id;
 @Entity
 public class Request {
 
-    @Id @GeneratedValue
-    long id;
+    @Id
     protected String request;
 }

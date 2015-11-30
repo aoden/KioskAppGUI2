@@ -172,11 +172,11 @@ public class BaseService extends AbstractService {
         return KioskUI.playCount > 1 && KioskUI.activated ? processData() : processData(getData(getLogin(keys)));
     }
 
-    public String getLogin(List<Key> keys) throws Exception {
+    public String getLogin(List<Key> keys) {
         if (keys == null) {
             keys = keyRepository.findAll();
         }
-        return login(keys.get(0).getKey());
+        return keys.isEmpty() ? null : keys.get(0).getKey();
     }
 
     public boolean registered() {
@@ -217,7 +217,7 @@ public class BaseService extends AbstractService {
                 byte[].class).getBody();
     }
 
-    protected String login(String key) throws Exception {
+    public String login(String key) {
 
         UriComponentsBuilder builder = UriComponentsBuilder
                 .fromHttpUrl(baseURL + "auth")
