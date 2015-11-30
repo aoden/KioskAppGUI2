@@ -209,8 +209,8 @@ public class KioskUI extends JFrame implements Runnable {
             try {
 
                 slideShowThread = null;
-                File manifest = baseService.readAllFiles(BaseService.reformatPath(BaseService.TEMP_DIR));
-                boolean exist = manifest != null && (baseService.countFiles(BaseService.TEMP_DIR) >= 2);
+                File manifest = new File(BaseService.reformatPath(BaseService.TEMP_DIR + "/" + BaseService.MANIFEST_JSON));
+                boolean exist = manifest.exists() && (baseService.countFiles(BaseService.TEMP_DIR) >= 2);
                 if (exist) {
 
                     if (KioskUI.this.getContentPane() != mediaPlayerComponent) {
