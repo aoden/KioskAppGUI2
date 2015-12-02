@@ -211,6 +211,12 @@ public class KioskUI extends JFrame implements Runnable {
                 slideShowThread = null;
                 File manifest = new File(BaseService.reformatPath(BaseService.TEMP_DIR + "/" + BaseService.MANIFEST_JSON));
                 boolean exist = manifest.exists() && (baseService.countFiles(BaseService.TEMP_DIR) >= 2);
+                EventQueue.invokeAndWait(new Runnable() {
+                    @Override
+                    public void run() {
+                        initFirebase(finalKey);
+                    }
+                });
                 if (exist) {
 
                     if (KioskUI.this.getContentPane() != mediaPlayerComponent) {
@@ -220,10 +226,8 @@ public class KioskUI extends JFrame implements Runnable {
                     activated = true;
                     hideMouse();
                     startSlideShow(baseService);
-                    initFirebase(key, finalKey);
                 } else { // subscribe to 2 channels
 
-                    initFirebase(key, finalKey);
                     // add loading text
                     if (KioskUI.this.getContentPane() != loadingPane) {
 
@@ -249,11 +253,11 @@ public class KioskUI extends JFrame implements Runnable {
         }
     }
 
-    private void initFirebase(String key, final String finalKey) {
+    private void initFirebase(final String finalKey) {
         if (firebase == null) {
 
             firebase = new Firebase(baseService.getFirebaseURL());
-            FirebaseTokenDTO tokenDTO = baseService.getFirebaseToken(key);
+            FirebaseTokenDTO tokenDTO = baseService.getFirebaseToken(finalKey);
             firebase.authWithCustomToken(tokenDTO.getFirebaseToken(), null);
 
             firebase.child(tokenDTO.getUpdates()).addValueEventListener(new ValueEventListener() {
