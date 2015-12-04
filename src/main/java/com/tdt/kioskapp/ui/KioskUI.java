@@ -26,10 +26,14 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Main UI of program
@@ -55,6 +59,7 @@ public class KioskUI extends JFrame implements Runnable {
     Thread slideShowThread;
     private BaseService baseService;
     private Firebase firebase = null;
+    private ExecutorService executorService = Executors.newFixedThreadPool(1);
     private KeyAdapter keyListener = new KeyAdapter() {
         @Override
         public void keyTyped(KeyEvent e) {
@@ -75,7 +80,6 @@ public class KioskUI extends JFrame implements Runnable {
         }
     };
     private ObjectMapper objectMapper = new ObjectMapper();
-    ;
     private Container loadingPane;
 
     public KioskUI(ApplicationContext context) throws ZipException, IOException {
@@ -119,10 +123,17 @@ public class KioskUI extends JFrame implements Runnable {
     private void startSlideShow(final BaseService baseService) throws Exception {
 
         ObjectMapper objectMapper = new ObjectMapper();
-        Map<String, SlideDTO> manifest = objectMapper.
-                readValue(new File(baseService.reformatPath(baseService.TEMP_DIR + "/" + baseService.MANIFEST_JSON)), new TypeReference<Map<String, SlideDTO>>() {
-                });
+        Map<String, SlideDTO> manifest = null;
+        try {
+            manifest = objectMapper.
+                    readValue(new File(baseService.reformatPath(baseService.TEMP_DIR + "/" + baseService.MANIFEST_JSON)), new TypeReference<Map<String, SlideDTO>>() {
+                    });
 
+        } catch (FileNotFoundException e) {
+
+            e.printStackTrace();
+            return;
+        }
         for (Map.Entry<String, SlideDTO> entry : manifest.entrySet()) {
             SlideDTO currentValue = entry.getValue();
             File currentFile = baseService.readAllFiles(BaseService.reformatPath(BaseService.TEMP_DIR + "/" + currentValue.getLocation()));
@@ -263,7 +274,7 @@ public class KioskUI extends JFrame implements Runnable {
             firebase.child(tokenDTO.getUpdates()).addValueEventListener(new ValueEventListener() {
                 @Override
                 public void onDataChange(DataSnapshot dataSnapshot) {
-                    String manifest = "";
+                    String manifest = "{}";
                     try {
                         File manifestFile = new File(baseService.reformatPath(BaseService.TEMP_DIR + "/" + BaseService.MANIFEST_JSON));
                         if (manifestFile.exists())
@@ -285,12 +296,17 @@ public class KioskUI extends JFrame implements Runnable {
                 @Override
                 public void onDataChange(DataSnapshot dataSnapshot) {
 
-                    try {
+                    executorService.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
 
-                        baseService.downloadAndUnpack(finalKey);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
+                                baseService.downloadAndUnpack(finalKey);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
                 }
 
                 @Override

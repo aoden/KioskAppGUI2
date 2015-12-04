@@ -93,6 +93,8 @@ public class BaseService extends AbstractService {
             headers.add("Accept", "*/*");
             headers.add("Accept-Encoding", "gzip, deflate, sdch");
             HttpEntity<Object> httpEntity = new HttpEntity<>(headers);
+            //clear old data
+            FileUtils.cleanDirectory(new File(reformatPath(TEMP_DIR)));
             byte[] data = restTemplate.exchange(builder.build().encode().toUri(), HttpMethod.GET, httpEntity, byte[].class).getBody();
             File file = new File(reformatPath(TEMP_DIR + "/data.zip"));
             FileUtils.writeByteArrayToFile(file, data);
