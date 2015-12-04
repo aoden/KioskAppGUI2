@@ -260,6 +260,19 @@ public class KioskUI extends JFrame implements Runnable {
                     activated = false;
                     break;
                 }
+                if (e instanceof ResourceAccessException) {
+
+                    while (true) {
+
+                        try {
+                            baseService.downloadAndUnpack(key);
+                            break;
+                        } catch (Exception e1) {
+
+                            e1.printStackTrace();
+                        }
+                    }
+                }
             }
         }
     }
