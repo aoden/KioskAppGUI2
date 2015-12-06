@@ -72,6 +72,12 @@ public class BaseService extends AbstractService {
         return reformattedPath;
     }
 
+    /**
+     * get firebase token from WS
+     *
+     * @param key access token
+     * @return firebase token
+     */
     public FirebaseTokenDTO getFirebaseToken(String key) {
 
         UriComponentsBuilder builder = UriComponentsBuilder
@@ -80,6 +86,11 @@ public class BaseService extends AbstractService {
         return restTemplate.exchange(builder.build().encode().toUri(), HttpMethod.GET, null, FirebaseTokenDTO.class).getBody();
     }
 
+    /**
+     * Download from WS and unpack to temp dir
+     * @param key access token
+     * @throws Exception
+     */
     public void downloadAndUnpack(String key) throws Exception {
 
         List<Request> requests = requestRepository.findAll();
@@ -103,6 +114,14 @@ public class BaseService extends AbstractService {
         }
     }
 
+    /**
+     * get update request and store to db
+     *
+     * @param key      access token
+     * @param manifest current local manifest.json
+     * @return request token DTO
+     */
+    @Transactional
     public RequestPackageDTO getRequest(String key, String manifest) {
         UriComponentsBuilder builder = UriComponentsBuilder
                 .fromHttpUrl(baseURL + "request-package")
@@ -114,6 +133,11 @@ public class BaseService extends AbstractService {
         return requestPackageDTO;
     }
 
+    /**
+     * count all files in a directory
+     * @param location directory's location
+     * @return number of files
+     */
     public int countFiles(String location) {
 
         File folder = new File(location);
@@ -125,6 +149,12 @@ public class BaseService extends AbstractService {
         return result;
     }
 
+    /**
+     * find a file in a directory
+     * @param location directory's location
+     * @param fileName file name
+     * @return file object
+     */
     public File findFile(String location, String fileName) {
 
         File folder = new File(location);
@@ -161,11 +191,22 @@ public class BaseService extends AbstractService {
         return null;
     }
 
+    /**
+     * This method used in part 1, but now seems deprecated
+     * @param tokenKey
+     * @return
+     * @throws Exception
+     */
     public Map<String, SlideDTO> readManifest(String tokenKey) throws Exception {
 
         return KioskUI.playCount > 1 && KioskUI.activated ? processData() : processData(getData(login(register(tokenKey))));
     }
 
+    /**
+     * This method used in part 1, but now seems deprecated
+     * @return
+     * @throws Exception
+     */
     public Map<String, SlideDTO> readManifest() throws Exception {
         List<Key> keys = keyRepository.findAll();
         if (keys == null || keys.isEmpty()) {

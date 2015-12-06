@@ -120,17 +120,24 @@ public class KioskUI extends JFrame implements Runnable {
         System.out.println(BaseService.reformatPath(path));
     }
 
+    /**
+     * Loop through themp dir and play media according to manifest.json
+     *
+     * @param baseService spring application context
+     * @throws Exception
+     */
     private void startSlideShow(final BaseService baseService) throws Exception {
 
         ObjectMapper objectMapper = new ObjectMapper();
         Map<String, SlideDTO> manifest = null;
-        try {
+        try { //try to read fron temp dir
             manifest = objectMapper.
                     readValue(new File(baseService.reformatPath(baseService.TEMP_DIR + "/" + baseService.MANIFEST_JSON)), new TypeReference<Map<String, SlideDTO>>() {
                     });
 
         } catch (FileNotFoundException e) {
 
+            // there will be a main loop in the program so just return when we have exception
             e.printStackTrace();
             return;
         }
@@ -152,6 +159,7 @@ public class KioskUI extends JFrame implements Runnable {
 
     private void initUI() {
 
+        // make program fullscreen
         setExtendedState(JFrame.MAXIMIZED_BOTH);
         setLayout(new BorderLayout());
         setUndecorated(true);
@@ -185,6 +193,13 @@ public class KioskUI extends JFrame implements Runnable {
         play(location, duration);
     }
 
+    /**
+     * Play the media
+     * @param location location of media
+     * @param duration play duration
+     * @throws IOException
+     * @throws InterruptedException
+     */
     private void play(String location, int duration) throws IOException, InterruptedException {
 
         hideMouse();
@@ -222,13 +237,14 @@ public class KioskUI extends JFrame implements Runnable {
                 slideShowThread = null;
                 File manifest = new File(BaseService.reformatPath(BaseService.TEMP_DIR + "/" + BaseService.MANIFEST_JSON));
                 boolean exist = manifest.exists() && (baseService.countFiles(BaseService.TEMP_DIR) >= 2);
+                //subscribe to update and download channel,
                 EventQueue.invokeAndWait(new Runnable() {
                     @Override
                     public void run() {
                         initFirebase(finalKey);
                     }
                 });
-                if (exist) {
+                if (exist) {   // files already existed on temp dir, try to play
 
                     if (KioskUI.this.getContentPane() != mediaPlayerComponent) {
                         KioskUI.this.setContentPane(mediaPlayerComponent);
@@ -237,7 +253,7 @@ public class KioskUI extends JFrame implements Runnable {
                     activated = true;
                     hideMouse();
                     startSlideShow(baseService);
-                } else { // subscribe to 2 channels
+                } else {
 
                     // add loading text
                     if (KioskUI.this.getContentPane() != loadingPane) {
@@ -248,6 +264,7 @@ public class KioskUI extends JFrame implements Runnable {
                         JLabel loadingText = new JLabel("<html><font color='gray'>LOADING...</font></html>");
                         KioskUI.this.getContentPane().add(loadingText);
                         resetUI();
+                        // if the program just startup, and files not found, force to download
                         if (playCount == 0) {
 
                             baseService.downloadAndUnpack(finalKey);
@@ -264,6 +281,7 @@ public class KioskUI extends JFrame implements Runnable {
                     activated = false;
                     break;
                 }
+                // retry if connection is corrupted
                 if (e instanceof ResourceAccessException) {
 
                     while (true) {
