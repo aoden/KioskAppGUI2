@@ -248,6 +248,10 @@ public class KioskUI extends JFrame implements Runnable {
                         JLabel loadingText = new JLabel("<html><font color='gray'>LOADING...</font></html>");
                         KioskUI.this.getContentPane().add(loadingText);
                         resetUI();
+                        if (playCount == 0) {
+
+                            baseService.downloadAndUnpack(finalKey);
+                        }
                     }
                 }
             } catch (Exception e) {
